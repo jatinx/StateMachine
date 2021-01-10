@@ -1,5 +1,8 @@
 #include <StateMachine.hpp>
+
+#include <algorithm>
 #include <iostream>
+
 namespace States {
 
 bool State::init(void *data) {
@@ -55,6 +58,30 @@ void StateMachine::runImpl() {
   status = FINISHED;
 }
 
+void StateMachine::rollBackImpl() {
+  auto revStates = states;
+  if (runningState) {
+    auto r_ = std::find(revStates.begin(), revStates.end(), runningState);
+    std::reverse(revStates.begin(), r_);
+  } else {
+    std::reverse(revStates.begin(), revStates.end());
+  }
+  for (const auto &i : revStates) {
+    runningState = i;
+    // First Gather Data then run the error process
+    if (!i->rollback(data)) {
+      DevLog(i->getName() + " - State has errors");
+      status = ERROR;
+      return;
+    }
+    if (isAsync && forceStop) {
+      status = STOPPED;
+      return;
+    }
+  }
+  status = FINISHED;
+}
+
 bool StateMachine::run() {
   status = RUNNING;
   if (isAsync) {
@@ -62,6 +89,19 @@ bool StateMachine::run() {
     runThread = std::thread(&StateMachine::runImpl, this);
   } else {
     runImpl();
+    if (status != FINISHED)
+      return false;
+  }
+  return true;
+}
+
+bool StateMachine::rollBack() {
+  status = RUNNING;
+  if (isAsync) {
+    DevLog("Async Execution");
+    runThread = std::thread(&StateMachine::rollBackImpl, this);
+  } else {
+    rollBackImpl();
     if (status != FINISHED)
       return false;
   }

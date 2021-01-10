@@ -37,6 +37,7 @@ public:
   virtual bool process(void *data) = 0;
   virtual bool exit(void *data);
   virtual bool error(void *data);
+
   virtual bool rollback(void *data);
   ~State() {}
 };
@@ -53,6 +54,7 @@ class StateMachine {
   bool forceStop;
   std::thread runThread;
   void runImpl();
+  void rollBackImpl();
   void *data;
 
 public:
@@ -78,7 +80,9 @@ public:
 
   StateMachine &addState(State *state_);
   std::vector<std::string> getNames();
+
   bool run();
+  bool rollBack();
 
   ~StateMachine() { awaitCompletion(); }
 };
